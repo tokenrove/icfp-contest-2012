@@ -1,5 +1,140 @@
 #+TITLE ICFP 2012 notes/scratch
 
+
 * Initial setup
+  CLOCK: [2012-07-13 Fri 11:03]--[2012-07-13 Fri 11:59] =>  0:56
   CLOCK: [2012-07-13 Fri 10:53]--[2012-07-13 Fri 10:59] =>  0:06
 
+ - distribution:
+   - ./src/ where sourcecode lives
+   - ./install
+   - ./lifter < map > route
+   - ./PACKAGES packages to install
+   - ./README
+
+ - use buildapp to produce final executable
+ - use quicklisp for bringing in libraries, but plunk them into vendor
+   or similar, use an asdf file for loading everything
+
+
+
+* Programs
+
+** Library
+   CLOCK: [2012-07-13 Fri 11:59]--[2012-07-13 Fri 12:13] =>  0:14
+
+ - reading metadata:
+   - read until we've found a robot and a lift.  if no robot or lift,
+     complain.
+   - first blank line after robot and lift marks start of metadata
+
+default water levels: water 0, flooding 0, waterproof 10
+
+*** STARTED develop model for CA
+     CLOCK: [2012-07-13 Fri 12:13]--[2012-07-13 Fri 16:30] =>  4:17
+
+  - the outer border should never change since there should always be
+    walls, so don't bother updating it.
+
+  - model:
+    - (m,n) array of values
+    - robot position
+    - lift position and state
+    - lambda positions
+
+
+ The lift is never open at the start, according to the spec.
+
+ Update map only needs to consider tiles with rocks.
+
+ Maybe we should use bitplanes?  Then you can have fast updates.
+  - m x n planes:
+    - empty?
+    - rock?
+    - lambda?
+
+ a robot move can change the rock plane and the empty plane.
+
+ If it's not empty, it could be a bunch of stuff.
+
+
+*** STARTED develop model for robot movement
+    CLOCK: [2012-07-13 Fri 16:46]--[2012-07-13 Fri 17:19] =>  0:33
+
+** Simulator
+
+  - non-graphical: take a map and a move, output resulting map
+  - graphical:
+    - use tiles
+    - forward/back buttons
+    - eventually some way to visualize danger by tinting tiles red
+    - take route input from program or 
+    - show water levels with blue tint
+
+ - return condition (win, lose, abort), number of turns, and lambdas
+   collected.
+
+** Lifter
+
+Plan moves one at a time or as a whole?
+One at a time is simple and fast but suboptimal.
+
+Perhaps we should implement a greedy player as a quick test, who at
+each tick:
+ - moves to the nearest open lift, or nearest lambda if lift is
+   unavailable.
+
+
+
+** Harness
+
+ - pass map to lifter
+ - send SIGINT at 150s
+ - send SIGKILL at 160s
+  compute points w/simulator
+
+* Strategies
+  CLOCK: [2012-07-13 Fri 17:19]--[2012-07-13 Fri 17:33] =>  0:14
+
+ - compute as long as possible, keeping a route to emit when we get
+   SIGINT.
+ - always append abort to the route?
+
+ - could we use connected components in planning regions?
+
+ - probably want something like A* for route planning
+
+ - use lookahead in simulator to display danger regions
+
+Key to good planning is going to be proper modelling of the risk of
+rocks; they basically have a triangular risk projection.
+
+The relationship between earth and empty spaces is key.
+
+Use the PAIP and AIMA source (and books) as references.
+
+
+Observations:
+ - the lift only opens if all lambdas are collected.
+ - rocks are presently the main hazard
+ - there appears to be no penalty for appending A to a route.
+ - there may be an opportunity for a peephole optimizer to improve a
+   route.
+ - it's possible to block oneself from the lift with rocks.
+ - it's possible to get a negative score.
+
+ - where the robot is standing presently is actually empty.
+ - the state of the lift is implicit in the number of lambdas
+   remaining.
+
+
+ - the math is easier if we reverse y
+ - with flooding, lambdas with higher positions become more valuable
+   than lower-lying lambdas 
+
+
+* Lightning Round
+  DEADLINE: <2012-07-14 Sat 12:00>
+
+* Main deadline
+  DEADLINE: <2012-07-16 Mon 12:00>
