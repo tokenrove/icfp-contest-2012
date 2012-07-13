@@ -31,6 +31,7 @@
 default water levels: water 0, flooding 0, waterproof 10
 
 *** STARTED develop model for CA
+    CLOCK: [2012-07-13 Fri 18:11]--[2012-07-13 Fri 18:47] =>  0:36
      CLOCK: [2012-07-13 Fri 12:13]--[2012-07-13 Fri 16:30] =>  4:17
 
   - the outer border should never change since there should always be
@@ -53,9 +54,23 @@ default water levels: water 0, flooding 0, waterproof 10
     - rock?
     - lambda?
 
- a robot move can change the rock plane and the empty plane.
+ a robot move can change the rock plane, lambda plane, the earth
+ plane, and the empty plane.
+ a rock move can only change the rock plane and the empty plane.
+
+if you compute empty at the beginning, you can throw away the earth
+plane, because earth = (not empty) & (not rock) & (not lambda) & (not
+wall), and earth is not necessary to compute anything.  Actually, this
+isn't true; you need earth, but perhaps not wall.  Well, you need one
+or the other.
 
  If it's not empty, it could be a bunch of stuff.
+
+
+If you pad each row to a power of two, you can do efficient shifting
+by implementing your own bignums.  Vertical shifts can just offset the
+pointer by the row stride, while horizontal shifts can rotate on the
+fly with nearby words.
 
 
 *** STARTED develop model for robot movement
@@ -76,6 +91,12 @@ default water levels: water 0, flooding 0, waterproof 10
 
 ** Lifter
 
+ - parent that spawns child
+   - first determines parameters of input
+   - spawns appropriate lifter based on input size
+   - implement a non-consing lifter for huge maps
+ - child communicates routes back to parent with estimated value
+
 Plan moves one at a time or as a whole?
 One at a time is simple and fast but suboptimal.
 
@@ -83,6 +104,7 @@ Perhaps we should implement a greedy player as a quick test, who at
 each tick:
  - moves to the nearest open lift, or nearest lambda if lift is
    unavailable.
+
 
 
 
@@ -94,10 +116,13 @@ each tick:
   compute points w/simulator
 
 * Strategies
+  CLOCK: [2012-07-13 Fri 17:33]--[2012-07-13 Fri 18:11] =>  0:38
   CLOCK: [2012-07-13 Fri 17:19]--[2012-07-13 Fri 17:33] =>  0:14
 
  - compute as long as possible, keeping a route to emit when we get
    SIGINT.
+ - use a parent-child model: the child does the hard stuff, and if it
+   dies for any reason, have the parent output whatever it can.
  - always append abort to the route?
 
  - could we use connected components in planning regions?
@@ -105,6 +130,12 @@ each tick:
  - probably want something like A* for route planning
 
  - use lookahead in simulator to display danger regions
+
+ - use the fact that the lift only opens if you have all the lambdas
+   to consider alternate abort routes
+
+ - one reason to optimize the CA is that the faster we can evaluate
+   routes, the more options we can try.
 
 Key to good planning is going to be proper modelling of the risk of
 rocks; they basically have a triangular risk projection.

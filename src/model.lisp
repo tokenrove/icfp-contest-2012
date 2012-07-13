@@ -66,6 +66,17 @@
   (setf (earth? m p) nil)
   (when lambda-pickup? (setf (lambda? m p) nil)))
 
+(defun empty-plane (m)
+  (bitplane:make-plane (model-width m) (model-height m)
+                       :bits (lognot
+                              (logior (bitplane::bits (model-wall-plane m))
+                                      (bitplane::bits (model-rock-plane m))
+                                      (bitplane::bits (model-lambda-plane m))
+                                      (ash 1 (offset<-point (model-robot m) (model-width m)))
+                                      (ash 1 (offset<-point (model-lift m) (model-width m)))))))
+
+(defun offset<-point (p w) (+ (realpart p) (* (imagpart p) w)))
+
 (defun visualize (m)
   (loop for y from (model-height m) downto 0
         do (progn
