@@ -96,6 +96,11 @@ or earth & P'
 or (|O| < 2) & (R&P') & (E& P'+O)
 
 ** Simulator
+   CLOCK: [2012-07-13 Fri 22:57]--[2012-07-13 Fri 23:15] =>  0:18
+
+ should take map and metadata
+ if metadata contains route, compute the route til an ending
+ condition, print final map, condition, and points
 
   - non-graphical: take a map and a move, output resulting map
   - graphical:
@@ -107,6 +112,9 @@ or (|O| < 2) & (R&P') & (E& P'+O)
 
  - return condition (win, lose, abort), number of turns, and lambdas
    collected.
+
+I'm tempted to implement the simulator in J, but maybe python is a
+better choice.
 
 ** Lifter
 
@@ -127,7 +135,8 @@ each tick:
 
 
 
-** Harness
+** DONE Harness
+   - State "DONE"       from ""           [2012-07-13 Fri 22:48]
 
  - pass map to lifter
  - send SIGINT at 150s
@@ -218,5 +227,36 @@ Observations:
 * Lightning Round
   DEADLINE: <2012-07-14 Sat 12:00>
 
+
+** Getting back on track
+   CLOCK: [2012-07-13 Fri 21:44]--[2012-07-13 Fri 22:52] =>  1:08
+
+Well, it's safe to say we've been distracted in many ways.  I think
+the key for tonight should be getting a harness working and then a
+simple lifter at least doing basic A*.
+
+Ok.  What's the simplest possible harness?
+ - given a map, execute lifter with map as input
+ - set timer, send SIGINT, SIGKILL
+ - pass route as output to simulator in score mode
+ - read score back from simulator
+
+How about testing the simulator?
+ - input contains map and route as metadata
+ - output contains final map and score
+ - for each in, compare with out (diff -q)
+
+
+Test suite:
+ - simulator against cases plucked from the validator
+ - harness against stubborn lifters
+   - one does nothing until SIGINT
+   - another does nothing until SIGKILL
+
+Some system of evaluating lifters against each other...
+Get the harness working first.  The graphical simulator can come after
+the lightning round.
+
+ 
 * Main deadline
   DEADLINE: <2012-07-16 Mon 12:00>
