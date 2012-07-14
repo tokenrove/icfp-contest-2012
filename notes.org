@@ -96,7 +96,12 @@ or earth & P'
 or (|O| < 2) & (R&P') & (E& P'+O)
 
 ** Simulator
+   CLOCK: [2012-07-14 Sat 11:13]--[2012-07-14 Sat 15:15] =>  4:02
+   CLOCK: [2012-07-13 Fri 23:16]--[2012-07-14 Sat 01:42] =>  2:26
    CLOCK: [2012-07-13 Fri 22:57]--[2012-07-13 Fri 23:15] =>  0:18
+
+harness might need to eat initial whitespace since we probably can't
+deal with it.
 
  should take map and metadata
  if metadata contains route, compute the route til an ending
@@ -217,11 +222,40 @@ Observations:
  - with flooding, lambdas with higher positions become more valuable
    than lower-lying lambdas
 
+One possible heuristic that could be computed early is the route if
+rocks are considered empty.  This is somewhat accurate but certainly
+an underestimate in the presence of rocks.
+
+In the lifter, why don't we represent state in some way more relevant
+to our heuristics, like a fatal bitplane (actually, just mark fatal
+states as impassible).
+
+
+
 * Research
+  CLOCK: [2012-07-14 Sat 09:21]--[2012-07-14 Sat 11:12] =>  1:51
   CLOCK: [2012-07-13 Fri 18:25]--[2012-07-13 Fri 21:37] =>  3:12
 
  - can we use BDDs for this?
  - what about efficient cellular automata search?
+ - D*-lite
+ - SetA*
+
+Consider a cluster approach for a heuristic.  Compute connected
+components where a component consists of any three or four-way
+adjacencies, and edges consist of two-way adjacencies.  Cells with
+only one opening are ignored.
+
+I wonder if a BDD could be used in the larger route planning, if each
+variable represents getting a lambda, you're trying to satisfy f(x..)
+= 1 (get all lambdas) with minimal weight (cost of getting that lambda
+from here).
+
+A zero-supressed BDD might be good for representing a function that's
+sparse, like rock mapping or similar.
+
+Ok, clearly I don't understand BDDs/ZDDs well enough to implement
+them, so back to simpler approaches.
 
 
 * Lightning Round
@@ -229,6 +263,7 @@ Observations:
 
 
 ** Getting back on track
+   CLOCK: [2012-07-14 Sat 09:13]--[2012-07-14 Sat 09:21] =>  0:08
    CLOCK: [2012-07-13 Fri 21:44]--[2012-07-13 Fri 22:52] =>  1:08
 
 Well, it's safe to say we've been distracted in many ways.  I think
