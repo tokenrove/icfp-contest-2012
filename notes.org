@@ -31,6 +31,7 @@
 default water levels: water 0, flooding 0, waterproof 10
 
 *** STARTED develop model for CA
+    CLOCK: [2012-07-13 Fri 21:38]--[2012-07-13 Fri 21:44] =>  0:06
     CLOCK: [2012-07-13 Fri 18:11]--[2012-07-13 Fri 18:47] =>  0:36
      CLOCK: [2012-07-13 Fri 12:13]--[2012-07-13 Fri 16:30] =>  4:17
 
@@ -73,8 +74,26 @@ pointer by the row stride, while horizontal shifts can rotate on the
 fly with nearby words.
 
 
+Logic model:
+ 1. R and up(E) => down(R), E!
+ 2. R and up(R) and left(E) and upleft(E) => downright(R), E!
+ 3. R and up(R) and right(E) and upright(E) => downleft(R), E!
+ 4. R and up(λ) and left(E) and upleft(E) => downright(R), E!
+ 5. R => R
+
+R' = R & ~(1 | 2 | 3 | 4) | (1 & down(R)) | ((2|4) & downright(R)) | (3 & downleft(R))
+
+E' = E & R' | (1 | 2 | 3 | 4)
+
+
 *** STARTED develop model for robot movement
     CLOCK: [2012-07-13 Fri 16:46]--[2012-07-13 Fri 17:19] =>  0:33
+
+P' = P + O
+valid when
+   E & P'
+or earth & P'
+or (|O| < 2) & (R&P') & (E& P'+O)
 
 ** Simulator
 
@@ -128,6 +147,11 @@ each tick:
  - could we use connected components in planning regions?
 
  - probably want something like A* for route planning
+   - SMA* might be wise
+   - can we do something smartly based on the fact that there's only
+     about 1G of RAM?
+
+We may be able to winnow the state space with a well-tuned Bloom filter, too.
 
  - use lookahead in simulator to display danger regions
 
@@ -143,6 +167,27 @@ rocks; they basically have a triangular risk projection.
 The relationship between earth and empty spaces is key.
 
 Use the PAIP and AIMA source (and books) as references.
+
+Per AIMA, problems consist of:
+ - the initial state (map, metadata);
+ - operators (robot movement);
+ - goal test (at lift or about to be crushed or drowned);
+ - path cost function (point value of route).
+
+Also, an admissable heuristic should be monotonic and should be as
+high as possible without overestimating.  You can take the maximum of
+several admissible heuristics.
+
+I'd say the first one to implement would be manhattan distance from
+the robot to nearest lambda through all lambdas to the lift.
+
+The number of lambdas is also a simple heuristic.  No path to the exit
+can be shorter than that.
+
+Flooding doesn't really change much, except for pruning many
+possibilities.  I guess that if we can make it clear in our search
+that certain possibilities become inaccessible as flooding proceeds,
+we should be able to handle it.
 
 
 Observations:
@@ -161,7 +206,13 @@ Observations:
 
  - the math is easier if we reverse y
  - with flooding, lambdas with higher positions become more valuable
-   than lower-lying lambdas 
+   than lower-lying lambdas
+
+* Research
+  CLOCK: [2012-07-13 Fri 18:25]--[2012-07-13 Fri 21:37] =>  3:12
+
+ - can we use BDDs for this?
+ - what about efficient cellular automata search?
 
 
 * Lightning Round
