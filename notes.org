@@ -145,6 +145,10 @@ each tick:
 
 
 
+*** lifter subroutines
+
+pavlidis contour tracing starting from the robot start point
+
 
 ** DONE Harness
    - State "DONE"       from ""           [2012-07-13 Fri 22:48]
@@ -223,6 +227,8 @@ Observations:
  - the state of the lift is implicit in the number of lambdas
    remaining.
 
+ - any state is a goal state
+
 
  - the math is easier if we reverse y
  - with flooding, lambdas with higher positions become more valuable
@@ -239,6 +245,7 @@ states as impassible).
 
 
 * Research
+  CLOCK: [2012-07-15 Sun 11:51]--[2012-07-15 Sun 15:00] =>  3:09
   CLOCK: [2012-07-14 Sat 09:21]--[2012-07-14 Sat 11:12] =>  1:51
   CLOCK: [2012-07-13 Fri 18:25]--[2012-07-13 Fri 21:37] =>  3:12
 
@@ -262,6 +269,46 @@ sparse, like rock mapping or similar.
 
 Ok, clearly I don't understand BDDs/ZDDs well enough to implement
 them, so back to simpler approaches.
+
+
+Could we use an image processing tool to speed this process up?
+
+Use Morton's Z-order curve for locality?
+
+If you use a highly-local measure, can you stream states?
+
+Can we transform states directly to score values efficiently?
+
+If you do the connected components-via-space-filling-curve approach,
+your model should make everything outside a wall impassible.
+
+Can we resolve the beard/rock conflict through bitwise manipulation?
+
+Branching: each node has up to four adjacencies, with trampolines
+being the only case where forward->back is not the same as
+wait. (except for other side-effects)
+
+
+Make your own maps using the method of Johnson, Yannakis, and
+Togelius:
+ - Initialize a grid to 50% earth, 50% wall
+ - iterate a CA with one rule:
+   - if (Moore neighborhood) 5 or more neighbors same as self,
+     - become rock, otherwise floor.
+ - the larger the n, the wider the caves
+
+Potential heuristic: per 2_kap2.pdf, use a closed space-filling curve
+like Moore or Sierpinski to generate a heuristic measure for a tour of
+points (all lambdas).
+
+Maybe the estimated cost of touring the lambdas plus the manhattan
+distance from the last lambda in the tour to the lift?
+
+
+** References
+
+Graphics Gems II
+
 
 
 * Lightning Round
@@ -301,3 +348,43 @@ the lightning round.
  
 * Main deadline
   DEADLINE: <2012-07-16 Mon 12:00>
+
+** Getting a submission in
+   CLOCK: [2012-07-15 Sun 11:02]--[2012-07-15 Sun 11:51] =>  0:49
+
+We have a harness and a (broken) simulator.  We need lifters.
+
+The model has become so dynamic, I think we need to look at possible
+heuristics again, but implement some kind of simple, fast, SMA*-style
+solver.
+
+We need g(n), the "cost" of the current position (points scored if we
+abort right now), and h(n), a heuristic about how many points could be
+scored if we moved to adjacent tiles.
+
+How much state do we have to keep track of?
+ - razors, water, lambdas
+ - trampolines
+ - rocks and beards are implicit in the map
+
+Some way to collapse states and use something like D*lite would be
+helpful.  You could also use homotopic contraction to crush large
+maps, as long as you kept track of the distance compressed.
+
+Is there a way to sparsely consider only areas into which we can move?
+Probably that should be the first thing we do... break the map into
+connected components using a simple bitwise connectivity model and
+trampolines.
+
+Why don't we store components as some kind of space filling curve from
+the robot origin so that move consideration is localized?  Aim for
+less space consumption than a simple grid, even when the map is dense.
+
+However you do it, it needs to be fast to compute the next state from
+the point of view of the cost and heuristic functions.
+
+Worst case locality of a curve:
+  $$\over{d(p,q)^2}{A(p,q)}$$
+with $d(p,q)$ the distance between points $p$ and $q$, and $A(p,q)$
+the area filled by the curve between $p$ and $q$.
+

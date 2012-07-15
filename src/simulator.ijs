@@ -63,6 +63,7 @@ waterLevel =: 0
 waterproof =: 10
 saturation =: 0                         NB. how long has the robot been underwater?
 nRazors =: 0
+growthRate =: 25
 state =: <'mining'
 
 simulateStep =: 3 : 0
@@ -91,6 +92,7 @@ elseif. y isIn validMoves do.                  NB. move
   board =: 'R' z am2d board
   board =: '*' ((left d) +. (right c)) am2d board
   board =: 'O' ((noLambdasRemain board) *. (lift board)) am2d board
+  NB. XXX check for S for shave
 end.                                    NB. anything else is treated as wait
 
   NB. Phase 2: update the board
