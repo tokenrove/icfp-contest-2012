@@ -1,7 +1,29 @@
-<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
-<html><head>
-<title>404 Not Found</title>
-</head><body>
-<h1>Not Found</h1>
-<p>The requested URL /~icfppc/maps/beard5.map was not found on this server.</p>
-</body></html>
+           ##########
+        ####..******####
+      ###..  3ABCDEF...###
+      ##                 ## 
+     ###                  ##
+    ###.....\\\...\\\.....###
+    #..     \\\ * \\\      ##
+    ##          *          ##
+     ###       ***        ##
+       #*****************##
+       ###..............##
+         ###...........##
+           ####WR..W####
+              ##L####
+               .....
+           ######  ######
+          ##1\! G##2 !\H##
+           ######  ######
+
+Trampoline A targets 1
+Trampoline B targets 1
+Trampoline C targets 1
+Trampoline D targets 1
+Trampoline E targets 1
+Trampoline F targets 1
+Trampoline G targets 2
+Trampoline H targets 3
+Growth 5
+Razors 0
