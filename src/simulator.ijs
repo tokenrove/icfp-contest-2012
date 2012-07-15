@@ -23,9 +23,14 @@ lambdas =: '\'&=
 earth =: '.'&=
 rocks =: '*'&=
 robot =: 'R'&=
-lift =: 'L'&=
+beards =: 'W'&=
+razors =: '!'&=
+NB. missing trampolines (A-G) and targets (1-9)
+lift =: 'O'&= + 'L'&=
 empty =: ' '&=
 lambdaCount =: +/ @: , @: lambdas
+noLambdasRemain =: 0 = lambdaCount
+movable =: empty + earth
 
 NB. 1. R and up(E) => down(R), E!
 NB. 2. R and up(R) and left(E) and upleft(E) => downright(R), E!
@@ -35,22 +40,93 @@ NB. 5. R => R
 NB. R' = R & ~(1 | 2 | 3 | 4) | (1 & down(R)) | ((2|4) & downright(R)) | (3 & downleft(R))
 NB. E' = E & R' | (1 | 2 | 3 | 4)
 updaterocks =: 3 : 0
-  updateRule1 =. rocks * (above @: empty)
-  updateRule2 =. rocks * (above @: rocks) * (leftAndUpLeft @: empty)
-  updateRule3 =. rocks * (above @: rocks) * (rightAndUpRight @: empty)
-  updateRule4 =. rocks * (above @: lambdas) * (leftAndUpLeft @: empty)
-  q =. updateRule1 y [ u =. updateRule2 y [ v =. updateRule3 y [ w =. updateRule4 y
+NB. XXX should probably calculate rocks once but i like these trains so much...
+  a =. (rocks * (above @: empty)) y
+  b =. (rocks * (above @: rocks) * (leftAndUpLeft @: empty)) y
+  c =. (rocks * (above @: rocks) * (rightAndUpRight @: empty)) y
+  d =. (rocks * (above @: lambdas) * (leftAndUpLeft @: empty)) y
   r =. rocks y
-  (r * (-. (q + u + v + w))) + (below r * q) + (right @: below r * (u+w)) + (left @: below r * v)
+  (r * (-. (a + b + c + d))) + (below r * a) + (right @: below r * (b+d)) + (left @: below r * c)
 )
 
 am2d =: 1 : '([: $ ]) $ [ (I. , u)} [: , ]'
+mdLookup =: ([ >@#~ (_1 |. (= <)))
+validMoves =: 'LRDU'
+isIn =: ([: # ]) > i.~
+
+NB. mutable state throughout simulation:
+board =: ''                             NB. set in main
+maxLambdas =: 0                         NB. set in main
+nMoves =: 0
+flooding =: 0
+waterLevel =: 0
+waterproof =: 10
+saturation =: 0                         NB. how long has the robot been underwater?
+nRazors =: 0
+state =: <'mining'
+
+simulateStep =: 3 : 0
+  NB. preconditions: make sure the map has a robot and a lift
+NB. .assert (1 = +/ ,lift board)
+NB. .assert (1 = +/ ,robot board)
+
+  NB. Phase 1: robot moves
+  NB. If move is A, abort immediately, do not update number of moves.
+if. -. state = <'mining' do. state
+elseif. 'A' = y do.
+  state =: <'abort'
+elseif. y isIn validMoves do.                  NB. move
+  NB. check for ordinary move, lambda pickup, razor pickup, rock move, or trampoline usage.
+  move =. (4 2 $ 0 1 0 _1 _1 0 1 0) {~ validMoves i. y
+  r =. move shift (robot board)
+  a =. r * (movable board)              NB. normal move
+  b =. r * (lambdas board)              NB. lambda pickup
+  c =. (y = 'R') * (r * (rocks board) * (left empty board))
+  d =. (y = 'L') * (r * (rocks board) * (right empty board))
+  e =. (noLambdasRemain board) * (r * lift board) NB. escape!
+  z =. (robot board) * (-. (a * b * c * d * e)) NB. no move succeeded
+  z =. a + b + c + d + e
+  z =. z + ((robot board) *~ (-. +/ ,z))
+  board =: ' ' (robot board) am2d board
+  board =: 'R' z am2d board
+  board =: '*' ((left d) + (right c)) am2d board
+  board =: 'O' ((noLambdasRemain board) * (lift board)) am2d board
+end.                                    NB. anything else is treated as wait
+
+  NB. Phase 2: update the board
+if. state = <'mining' do.
+  board =: ('*' (updaterocks board) am2d (' ' (rocks board) am2d board))
+  nMoves =: nMoves + 1
+end.
+  NB. the lift disappears only if the robot is on the open lift
+  done =. (-. +/ ,lift board)
+  NB. return condition
+if. done do. state =: <'escaped'
+elseif. +/ ,((robot board) * (below rocks board)) do. state =: <'crushed'
+elseif. 1 do. state =: <'mining'
+end.
+)
 
 main =: 0:0
   input =. splitByLines (snarfStdin '')
-  board =. ({.~ ({. @: squashInitial @: blankLines)) input
-  board =. ('*' (updaterocks board) am2d (' ' (rocks board) am2d board))
-  emit board
+  NB. take the non-metadata portion of the board
+  metadataSeparator =. {. @: squashInitial @: blankLines input
+  board =: metadataSeparator {. input
+  maxLambdas =: +/ ,lambdas board
+  metadata =: ;: @ , (metadataSeparator }. input)
+  route =: metadata mdLookup 'Route'
+  NB. simulateStep until condition output
+  simulateStep"0 route
+  emit board                            NB. emit final board state
+  emit ''
+  emit 'Number of moves: ',(":nMoves)
+  lambdasCollected =. maxLambdas - (lambdaCount board)
+  emit 'Lambdas collected: ',(":lambdasCollected)
+  emit 'Final state: ',(,>state)
+  NB. emit points
+  p =. (25 * lambdasCollected)
+  points =. p + ((-. state = <'crushed') * p) + ((state = <'escaped') * p) - nMoves
+  emit 'Points: ',(":points)
   exit 0
 )
 

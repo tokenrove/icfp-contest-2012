@@ -11,7 +11,7 @@ plan tests => (1+$#ins);
 for(@ins) {
     my $in = $_;
     my $out = s/\.in/\.out/r;
-    ok(0 == system("$SIMULATOR < $in | diff -qb - $out"));
+    ok(system("$SIMULATOR < $in | diff -qb - $out"), 0, "Case $in failed");
 }
 
 
