@@ -128,6 +128,9 @@ I'm tempted to implement the simulator in J, but maybe python is a
 better choice.
 
 ** Lifter
+   CLOCK: [2012-07-15 Sun 19:48]--[2012-07-15 Sun 23:11] =>  3:23
+   CLOCK: [2012-07-15 Sun 16:30]--[2012-07-15 Sun 18:37] =>  2:07
+   CLOCK: [2012-07-15 Sun 16:18]--[2012-07-15 Sun 16:22] =>  0:04
 
  - parent that spawns child
    - first determines parameters of input
@@ -142,13 +145,179 @@ Perhaps we should implement a greedy player as a quick test, who at
 each tick:
  - moves to the nearest open lift, or nearest lambda if lift is
    unavailable.
-
-
+   - 
 
 *** lifter subroutines
 
 pavlidis contour tracing starting from the robot start point
 
+
+*** MCTS lifter
+
+Three main components:
+ - the state table
+ - MCTS
+ - the simulator
+ 
+With MCTS, we're going to follow Schadd et al.'s SP-MCTS, including
+the idea of resetting search with a new random seed periodically.  The
+state table is responsible for persistence between MCTS searches.
+
+Simulation interface:
+ - given a state and a move:
+   - compute the value of the move and store it in the state table
+   - return valid moves from this position
+
+State table interface:
+ - get best score and route
+ - insert state with score and route
+
+MCTS:
+ - when building new nodes, get a list of valid moves from previous
+   state, and choose randomly from weighted list of moves
+
+We may want to mmap the state table or use an external store like
+redis to take advantage of disk space for large search spaces.  We
+have around 25G to take advantage of, but disk is cleared between
+runs.  We can shipped cached best results against the published
+problems with our submission, however.
+
+Schaad's paper shows that a better heuristic than random valid moves
+improves performance greatly, so we should probably try a couple like
+weighting moves by distance to nearest lambda or open lift.
+
+
+Ok, let's get the initial state by walking the map from the initial
+position, including all areas that can conceivably be reached:
+ - starting from R, include all neighbors
+ - if here is a wall or lift, stop.
+ - if here is a trampoline, connect the graph to the target
+
+This isn't going to work, let's just use a 2D array.
+One-dimensionalization seems fundamentally incompatible with the idea
+of a graph structure.
+
+Can we do this with a Morton curve?  How do we start at an arbitrary
+point and still cover the entire connected component?
+
+If we do this, we can represent traversible space as an array where
+each node has 4 bits for whether it has neighbors, and 4 bits for
+type:
+
+rock plane
+empty plane
+beard plane
+lambda plane
+
+Any way of tessellating the state storage so Moore neighborhood is
+easy to come by?
+
+| bits | name       | passable? bit 0           | connected? | stops rock? bits 2-3 = 01 | collectable? |
+|    0 | empty      | yes                       | yes        | no                        | no           |
+|    1 | wall       | no                        | no         | yes                       | no           |
+|   10 | earth      | yes                       | yes        | yes                       | yes          |
+|   11 | robot      | no                        | yes        | yes                       | ?            |
+|  110 | lambda     | yes                       | yes        | maybe                     | yes          |
+|  101 | rock       | no                        | yes        | maybe                     | ?            |
+|  100 |            |                           |            |                           |              |
+|  111 | horock     | no                        | yes        | maybe                     | ?            |
+| 1000 | razor      | yes                       | yes        | yes                       | yes          |
+| 1001 | beard      | no                        | yes        | yes                       | no           |
+| 1011 |            |                           |            |                           |              |
+| 1010 | jump       | yes                       | doubly so  | yes                       | yes          |
+| 1100 |            |                           |            |                           |              |
+| 1101 | target     | no                        | yes        | yes                       |              |
+| 1110 | open lift? |                           |            |                           | yes          |
+| 1111 | lift       | only if no lambdas remain | no         | yes                       |              |
+
+trampolines will not need to be individually labelled as the graph
+structure will be indicative of them, except that when trampolines
+disappear, you need to delete all of them -- so keep an auxiliary
+vector mapping trampolines to target nodes.  when a trampoline
+disappears, walk the trampoline vector removing all which hit the same
+target.
+
+Connectify needs to follow all eight adjacencies from a trampoline.
+
+How do beards deal with our 4-connected world?  Well, any fetch
+outside the node list is treated as a wall.
+
+other auxiliary information for a state:
+ - water level
+ - robot saturation
+ - points
+ - number of lambdas
+ - razors collected
+
+nodes will need to be labelled with a 32-bit int, to permit jumps.
+can we store things so that the usual case (adjacent squares) is
+implicit?  if type is not equal to jump, neighbors are found
+implicitly.  otherwise, look at auxiliary index.  so the node vector
+can be bytes.
+
+a heap can be stored in a compact way so that all traversal is
+implicit.  can we achieve the same thing with this quadtree model?
+
+what kind of memory allocation is required?  obviously we must keep at
+least one copy of the state, but the hash table need only contain the
+route and point information.
+
+the MCTS tree and the routes can grow without bound effectively, so
+too the hash table.
+
+state evaluation for each node needs its Moore neighborhood, so it
+needs to be fast to get that from the node vector.  be careful not to
+follow jumps when updating the board.  we'll keep an old and new state
+allocated and swap the pointers as we go.
+
+we could log routes to a file that the parent process reads on child
+termination or timeout (SIGINT).
+
+can we make estimates of how much space we'll need for the route tree
+and the hash table?  the hash table can be artificially limited as
+necessary.
+
+Ok, we can allocate a large, fixed-size hash table for states, as
+well as the two state buffers.
+
+
+So:
+
+ - main:
+   - read map data in temp buffer
+   - read metadata
+   - connectify:
+     - blow away old initial state file
+     - mmap a file with enough space for initial state buffer (m*n is
+       the maximum)
+     - traverse map into initial state buffer, including jump vector
+   - create future and prior state buffer as copy of initial
+     (maintain original as a file so we can do metasearch)
+   - open best log for async appends
+   - allocate hash table
+   - any allocations after this point will be for the MCTS tree, which
+     can be blown away each metasearch.
+   - while 1
+     - allocate new MCTS tree
+     - MCTS
+
+Although if the parent did the first three steps, the child could
+pretend each start was fresh.  That way metasearch could be a feature
+of the parent.  But the state table needs to be preserved.
+
+Parent:
+ - blow away temp files
+ - spawn child and pass stdin to it
+ - pause(3) until SIGINT
+   - restart child if we got SIGCHLD?
+ - on SIGINT, read tail of bestlog to stdout
+ - blow away temp files
+
+Metasearch should happen when we've played for a while and the best
+route hasn't changed much.
+
+Ok, forget about efficiency.  How could we get an implementation of
+MCTS done quickly?
 
 ** DONE Harness
    - State "DONE"       from ""           [2012-07-13 Fri 22:48]
@@ -245,9 +414,13 @@ states as impassible).
 
 
 * Research
+  CLOCK: [2012-07-15 Sun 15:07]--[2012-07-15 Sun 16:16] =>  1:09
   CLOCK: [2012-07-15 Sun 11:51]--[2012-07-15 Sun 15:00] =>  3:09
   CLOCK: [2012-07-14 Sat 09:21]--[2012-07-14 Sat 11:12] =>  1:51
   CLOCK: [2012-07-13 Fri 18:25]--[2012-07-13 Fri 21:37] =>  3:12
+
+Apparently IDA* with Manhattan Distance as a heuristic is very
+successful for Sokoban.
 
  - can we use BDDs for this?
  - what about efficient cellular automata search?
@@ -304,10 +477,61 @@ points (all lambdas).
 Maybe the estimated cost of touring the lambdas plus the manhattan
 distance from the last lambda in the tour to the lift?
 
+** MCTS
+   CLOCK: [2012-07-15 Sun 16:22]--[2012-07-15 Sun 16:30] =>  0:08
+   CLOCK: [2012-07-15 Sun 16:16]--[2012-07-15 Sun 16:18] =>  0:02
+
+- each node in the tree represents:
+  - a world state
+  - the average score of its subtrees
+  - the number of visits
+
+Repeatedly, we do:
+ - selection: traverse the tree
+   - choose node that maximizes upper confidence for trees:
+     $$ X\= + C\cdot\sqrt{\over{\ln t(N)}{t(N_i)}} + \sqrt{\over{\sum{x^2 - t(N_i)\cdotX\=^2+D}}{t(N_i)}} $$
+     - where $t(N)$ is times visited, $X\=$ is the average game value,
+       $x$ is the results obtained so far in the child node, and $D$
+       is a high constant so as to make rarely explored nodes
+       considered uncertain.
+     - tweak $C$ and $D$ based on range of scoring
+       - we can divide the points by 75*lambdas - (nlambdas+1) (absolute max
+         score) to get a score in the range (-inf,1]
+       - low C and D represents exploitation, high C and D represents
+         exploration
+       - probably start C at 0.5 and D at... 1?
+
+ - simulation: random simulation from this state, calculating points
+   - we're supposed to simulate til "end of game", but in this case,
+     end of game can be any time, so instead we should check valid
+     moves from here, caching points at each unique state
+   - it may be possible to reach the same state with different amounts
+     of points; if so, keep the shortest route (but what about water?
+     nah, who cares, the next state after will figure that out.)
+
+ - expansion: determine how many and which children should be stored
+   in the tree
+ - back-propagation: results are propagated back through the tree
+
+The tree represents routes.
+
+We initially populate the state table with the input state and zero
+points.  This is the route that is emitted if all goes wrong.
+
+When submitting states to the state table, keep the route with the
+most points... this should be the shortest route, but since we risk
+false positives by hashing states, we should compare the number of
+points associated with the state instead.
+
+Schadd et al. note that they only do selection if the threshold of the
+node selected is greater than a certain amount (they chose 10),
+otherwise they go straight to randomized simulation.
+
 
 ** References
 
 Graphics Gems II
+Samat's book
 
 
 

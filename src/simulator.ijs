@@ -1,4 +1,8 @@
 #!/usr/bin/env jconsole
+NB. A simple simulator for ICFP2012, based on the idea of treating the
+NB. map as a set of bitplanes.  Unfortunately, the order-dependence of
+NB. the update rules once beards were added make it too hard to
+NB. maintain this.
 
 exit =: 2!:55
 snarfStdin =: 1!:1 @ 3:

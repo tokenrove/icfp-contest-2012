@@ -1,3 +1,11 @@
 
 Team Squid and Tobacco:
      Julian Squires <julian@cipht.net>
+
+Most of the way through the weekend, I still hadn't found an
+admissable heuristic function I liked, or implemented anything other
+than various attempts at faster simulators so I could churn out more
+states.
+
+I decided to implement Monte Carlo Tree Search (MCTS) as an
+alternative to A* since I didn't have a good heuristic.
